@@ -46,41 +46,41 @@
   object-fit: contain;
 }
 
-.btn {
+.icon {
   display: inline-flex;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 16px;
   border: 0;
-  border-radius: 12px;
-  background: #3a3028;
-  color: #f6efe6;
-  font-weight: 600;
-  box-shadow: inset 0 -2px 0 #241c16;
+  border-radius: 10px;
+  background: transparent;
+  color: #8f8a83;
 }
 
-.btn-flame {
+.icon.on {
+  background: #1c1c1c;
+  color: #f3efe8;
+}
+
+.act {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
   background: #ff5a1f;
   color: #1c0d07;
-  box-shadow: inset 0 -2px 0 #c2410c;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.btn-soft {
-  background: #2a231c;
-  color: #f3efe8;
-  box-shadow: inset 0 -2px 0 #1a1511;
-}
-
-.btn-posted {
-  background: #1d3b31;
-  color: #d7f3e6;
-  box-shadow: inset 0 -2px 0 #10241d;
-}
-
-.btn-icon {
-  width: 44px;
-  padding: 0;
+.text-act {
+  height: 36px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: #c8c2b8;
+  font-size: 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {

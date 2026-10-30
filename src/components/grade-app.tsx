@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   addDays,
   endOfWeek,
@@ -7,7 +7,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, List, X } from "lucide-react";
 import {
   defaultCaptionIndex,
   piecesSorted,
@@ -24,6 +24,20 @@ type CalendarView = "semana" | "dia";
 
 function cap(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function driveId(src: string) {
+  return src.split("/d/")[1]?.split(/[?#=]/)[0] ?? "";
+}
+
+function thumb(src: string, width: number) {
+  const id = driveId(src);
+  return id ? `https://lh3.googleusercontent.com/d/${id}=w${width}` : src;
+}
+
+function whenLabel(at: string | null | undefined) {
+  if (!at || at.length < 16) return "";
+  return `${at.slice(8, 10)}/${at.slice(5, 7)} · ${at.slice(11, 16)}`;
 }
 
 function captionOf(piece: Piece, map: GradeMap) {
@@ -62,15 +76,31 @@ export function GradeApp() {
   const [map, setMap] = useState<GradeMap>({});
   const [today, setToday] = useState<Date | null>(null);
   const [cursor, setCursor] = useState<Date | null>(null);
-  const [layout, setLayout] = useState<"lista" | "grade">("lista");
+  const [layout, setLayout] = useState<"lista" | "grade">("grade");
   const [view, setView] = useState<CalendarView>("semana");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [synced, setSynced] = useState(false);
   const closeDetail = useCallback(() => setOpenId(null), []);
+  const openPieceById = useCallback((id: string) => setOpenId(id), []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setToday(new Date()), 15000);
+    const timer = window.setInterval(() => {
+      setToday((prev) => {
+        const next = new Date();
+        if (
+          prev &&
+          prev.getFullYear() === next.getFullYear() &&
+          prev.getMonth() === next.getMonth() &&
+          prev.getDate() === next.getDate() &&
+          prev.getHours() === next.getHours() &&
+          prev.getMinutes() === next.getMinutes()
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    }, 20000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -146,29 +176,35 @@ export function GradeApp() {
         <header>
           <img src="/marca.png" alt="Iron Supply" className="mx-auto h-14 w-auto" />
           <div className="mt-4 flex items-center justify-between gap-3">
-            <div>
-              <h1 className="font-display text-xl uppercase leading-none tracking-wide">Programação</h1>
-              <p className="mt-1 text-sm text-muted">Posts e stories</p>
+            <h1 className="font-display text-xl uppercase leading-none tracking-wide">Programação</h1>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Lista"
+                aria-pressed={layout === "lista"}
+                onClick={() => setLayout("lista")}
+                className={layout === "lista" ? "icon on" : "icon"}
+              >
+                <List aria-hidden="true" size={18} />
+              </button>
+              <button
+                type="button"
+                aria-label="Grade"
+                aria-pressed={layout === "grade"}
+                onClick={() => setLayout("grade")}
+                className={layout === "grade" ? "icon on" : "icon"}
+              >
+                <LayoutGrid aria-hidden="true" size={18} />
+              </button>
+              <button
+                type="button"
+                aria-label="Calendário"
+                onClick={() => setCalendarOpen(true)}
+                className="icon"
+              >
+                <Calendar aria-hidden="true" size={18} />
+              </button>
             </div>
-            <button type="button" onClick={() => setCalendarOpen(true)} className="btn btn-flame shrink-0">
-              Calendário
-            </button>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setLayout("lista")}
-              className={layout === "lista" ? "btn btn-flame flex-1" : "btn btn-soft flex-1"}
-            >
-              Lista
-            </button>
-            <button
-              type="button"
-              onClick={() => setLayout("grade")}
-              className={layout === "grade" ? "btn btn-flame flex-1" : "btn btn-soft flex-1"}
-            >
-              Grade
-            </button>
           </div>
         </header>
 
@@ -178,40 +214,36 @@ export function GradeApp() {
             if (items.length === 0) return null;
             return (
               <section key={format} aria-label={format === "story" ? "Stories" : "Posts"}>
-                <h2 className="font-display text-lg uppercase tracking-wide">
+                <h2 className="text-xs uppercase tracking-[0.16em] text-muted">
                   {format === "story" ? "Stories" : "Posts"}
                 </h2>
-                <ul
-                  className={
-                    layout === "grade"
-                      ? "mt-3 grid grid-cols-2 gap-3 md:grid-cols-3"
-                      : "mt-3 flex flex-col gap-4"
-                  }
-                >
-                  {items.map((piece) => (
-                    <li key={piece.id}>
-                      {layout === "grade" ? (
-                        <GradeTile
+                {layout === "grade" ? (
+                  <ul className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                    {items.map((piece) => (
+                      <li key={piece.id}>
+                        <PieceThumb
                           piece={piece}
-                          map={map}
+                          slot={map[piece.id]}
                           now={today}
-                          onOpen={() => setOpenId(piece.id)}
+                          onOpen={openPieceById}
                         />
-                      ) : (
-                        <PieceCard
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="mt-1">
+                    {items.map((piece) => (
+                      <li key={piece.id} className="border-b border-line">
+                        <PieceRow
                           piece={piece}
-                          map={map}
-                          onAt={(at) => setWhen(piece.id, at)}
-                          onProgram={() => patch(piece.id, { programmed: true })}
-                          onUndo={() => patch(piece.id, { programmed: false })}
+                          slot={map[piece.id]}
                           now={today}
-                          onCaption={(caption) => patch(piece.id, { caption })}
-                          onOpen={() => setOpenId(piece.id)}
+                          onOpen={openPieceById}
                         />
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
             );
           })}
@@ -308,46 +340,39 @@ function CalendarSheet({
       <div className="sticky top-0 z-10 border-b border-line bg-ink px-4 py-3">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <p className="font-display uppercase tracking-wide">Calendário</p>
-          <button
-            type="button"
-            aria-label="Fechar"
-            onClick={onClose}
-            className="btn btn-icon"
-          >
-            <X aria-hidden="true" />
+          <button type="button" aria-label="Fechar" onClick={onClose} className="icon">
+            <X aria-hidden="true" size={18} />
           </button>
         </div>
-        <div className="mx-auto mt-3 flex max-w-3xl gap-2">
+        <div className="mx-auto mt-2 flex max-w-3xl gap-4">
           {(["semana", "dia"] as const).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => onView(item)}
-              className={
-                view === item ? "btn btn-flame flex-1" : "btn btn-soft flex-1"
-              }
+              className={view === item ? "text-sm text-fg" : "text-sm text-muted"}
             >
               {item === "semana" ? "Semana" : "Dia"}
             </button>
           ))}
         </div>
-        <div className="mx-auto mt-3 flex max-w-3xl items-center justify-between gap-2">
+        <div className="mx-auto mt-1 flex max-w-3xl items-center justify-between gap-2">
           <button
             type="button"
             aria-label={view === "semana" ? "Semana anterior" : "Dia anterior"}
             onClick={() => onCursor(addDays(cursor, -step))}
-            className="btn btn-icon"
+            className="icon"
           >
-            <ChevronLeft aria-hidden="true" />
+            <ChevronLeft aria-hidden="true" size={18} />
           </button>
-          <p className="text-center font-display text-lg uppercase tracking-wide">{title}</p>
+          <p className="text-center text-sm">{title}</p>
           <button
             type="button"
             aria-label={view === "semana" ? "Próxima semana" : "Próximo dia"}
             onClick={() => onCursor(addDays(cursor, step))}
-            className="btn btn-icon"
+            className="icon"
           >
-            <ChevronRight aria-hidden="true" />
+            <ChevronRight aria-hidden="true" size={18} />
           </button>
         </div>
       </div>
@@ -377,12 +402,14 @@ function CalendarSheet({
                       <li key={piece.id} className="overflow-hidden rounded-xl border border-line bg-surface">
                         <div className="flex items-center justify-center bg-ink px-3 py-3">
                           <img
-                            src={piece.image}
+                            src={thumb(piece.image, view === "dia" ? 1200 : 640)}
                             alt={`${product.name}, ${piece.format === "story" ? "story" : "post"}`}
+                            loading="lazy"
+                            decoding="async"
                             className={
                               view === "dia"
                                 ? "max-h-[70vh] w-auto max-w-full object-contain"
-                                : "max-h-64 w-auto max-w-full object-contain"
+                                : "max-h-56 w-auto max-w-full object-contain"
                             }
                           />
                         </div>
@@ -411,7 +438,7 @@ function CalendarSheet({
 function Shot({ src, alt }: { src: string; alt: string }) {
   return (
     <div className="flex items-center justify-center bg-ink px-3 py-3">
-      <img src={src} alt={alt} className="max-h-[70vh] w-auto max-w-full object-contain" />
+      <img src={thumb(src, 1200)} alt={alt} decoding="async" className="max-h-[70vh] w-auto max-w-full object-contain" />
     </div>
   );
 }
@@ -420,7 +447,7 @@ function DownloadLink({ href }: { href: string }) {
   const id = href.split("/d/")[1]?.split(/[?#]/)[0];
   const file = id ? `https://drive.google.com/uc?export=download&id=${id}` : href;
   return (
-    <a href={file} className="btn btn-soft">
+    <a href={file} className="text-act">
       Baixar
     </a>
   );
@@ -439,7 +466,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onClick}
-      className="btn btn-flame self-start"
+      className="text-act"
     >
       {done ? "Copiado" : label}
     </button>
@@ -462,7 +489,7 @@ function CaptionSwitch({
         type="button"
         aria-label="Legenda anterior"
         onClick={() => onCaption((index - 1 + total) % total)}
-        className="btn btn-icon"
+        className="icon"
       >
         <ChevronLeft aria-hidden="true" size={18} />
       </button>
@@ -473,7 +500,7 @@ function CaptionSwitch({
         type="button"
         aria-label="Próxima legenda"
         onClick={() => onCaption((index + 1) % total)}
-        className="btn btn-icon"
+        className="icon"
       >
         <ChevronRight aria-hidden="true" size={18} />
       </button>
@@ -522,159 +549,107 @@ function ProgramControl({
   const state = phase(slot, now ?? new Date());
   if (state === "aberto") {
     return (
-      <button type="button" onClick={onProgram} className="btn btn-flame w-full">
+      <button type="button" onClick={onProgram} className="act">
         Programado
       </button>
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <p className={state === "postado" ? "btn btn-posted" : "btn btn-soft"}>
-        {state === "postado" ? "Postado" : "Programado"}
-      </p>
-      <button type="button" onClick={onUndo} className="btn btn-flame">
+    <div className="flex items-center gap-4">
+      <p className="text-sm">{state === "postado" ? "Postado" : "Programado"}</p>
+      <button type="button" onClick={onUndo} className="text-act">
         Voltar
       </button>
     </div>
   );
 }
 
-function GradeTile({
+const PieceThumb = memo(function PieceThumb({
   piece,
-  map,
+  slot,
   now,
   onOpen,
 }: {
   piece: Piece;
-  map: GradeMap;
+  slot: Slot | undefined;
   now: Date | null;
-  onOpen: () => void;
+  onOpen: (id: string) => void;
 }) {
   const product = productById(piece.product);
-  const state = phase(map[piece.id], now ?? new Date());
+  const state = phase(slot, now ?? new Date());
   const isStory = piece.format === "story";
   return (
-    <button type="button" onClick={onOpen} className="w-full overflow-hidden rounded-xl bg-surface text-left">
-      <span className="flex h-40 items-center justify-center bg-ink p-2">
+    <button type="button" onClick={() => onOpen(piece.id)} className="w-full text-left">
+      <span className="flex h-52 items-center justify-center">
         <img
-          src={piece.image}
+          src={thumb(piece.image, 480)}
           alt={`${product.name}, ${isStory ? "story" : "post"}`}
+          loading="lazy"
+          decoding="async"
           className="max-h-full max-w-full object-contain"
         />
       </span>
-      <span className="block p-2">
-        <span className="block text-xs font-medium">{product.name}</span>
-        <span className="mt-1 block text-xs uppercase tracking-wide text-muted">
-          {isStory ? "Story" : "Post"}
-        </span>
-        {state !== "aberto" && (
-          <span className={state === "postado" ? "btn btn-posted mt-2 h-8 w-full text-xs" : "btn btn-soft mt-2 h-8 w-full text-xs"}>
-            {state === "postado" ? "Postado" : "Programado"}
-          </span>
-        )}
+      <span className="mt-2 block text-xs">{product.name}</span>
+      <span className="mt-0.5 block text-xs text-muted">
+        {isStory ? "Story" : "Post"}
+        {state === "aberto" ? "" : state === "postado" ? " · Postado" : " · Programado"}
       </span>
     </button>
   );
-}
+});
 
-function PieceCard({
+const PieceRow = memo(function PieceRow({
   piece,
-  map,
+  slot,
   now,
-  onAt,
-  onProgram,
-  onUndo,
-  onCaption,
   onOpen,
 }: {
   piece: Piece;
-  map: GradeMap;
+  slot: Slot | undefined;
   now: Date | null;
-  onAt: (at: string) => void;
-  onProgram: () => void;
-  onUndo: () => void;
-  onCaption: (caption: number) => void;
-  onOpen: () => void;
+  onOpen: (id: string) => void;
 }) {
-  const at = map[piece.id]?.at ?? null;
-  const { product, index, text, total } = captionOf(piece, map);
-  const { copied, copy } = useCopy();
+  const product = productById(piece.product);
+  const state = phase(slot, now ?? new Date());
   const isStory = piece.format === "story";
-
+  const mark = state === "postado" ? "Postado" : state === "programado" ? "Programado" : "";
   return (
-    <article className="overflow-hidden rounded-xl border border-line bg-surface">
-      <button type="button" onClick={onOpen} className="block w-full">
-        <Shot src={piece.image} alt={`${product.name}, ${isStory ? "story" : "post"}`} />
-      </button>
-      <div className="flex flex-col gap-3 p-4">
-        <div>
-          <p className="text-sm font-medium">{product.name}</p>
-          <p className="mt-1 text-xs uppercase tracking-wide text-muted">{isStory ? "Story" : "Post"}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <DownloadLink href={piece.image} />
-          <button type="button" onClick={onOpen} className="btn btn-soft">
-            Ver maior
-          </button>
-        </div>
-        {isStory ? (
-          <StoryBlock />
-        ) : (
-          <>
-            <CaptionSwitch index={index} total={total} onCaption={onCaption} />
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
-            <CopyButton
-              label="Copiar legenda"
-              done={copied === "caption"}
-              onClick={() => copy("caption", text)}
-            />
-          </>
-        )}
-        <WhenFields at={at} onAt={onAt} />
-        <ProgramControl slot={map[piece.id]} now={now} onProgram={onProgram} onUndo={onUndo} />
-      </div>
-    </article>
+    <button type="button" onClick={() => onOpen(piece.id)} className="flex w-full items-center gap-3 py-2 text-left">
+      <img
+        src={thumb(piece.image, 240)}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="h-16 w-12 object-contain"
+      />
+      <span className="min-w-0">
+        <span className="block truncate text-sm">{product.name}</span>
+        <span className="mt-0.5 block text-xs text-muted">
+          {[isStory ? "Story" : "Post", whenLabel(slot?.at), mark].filter(Boolean).join(" · ")}
+        </span>
+      </span>
+    </button>
   );
-}
+});
 
 function WhenFields({ at, onAt }: { at: string | null; onAt: (at: string) => void }) {
   const now = stamp(new Date());
   const value = at || now;
   const date = value.slice(0, 10);
   const time = value.slice(11, 16);
-  const place = useRef(0);
-
-  function remember() {
-    place.current = window.scrollY;
-  }
-
-  function restore() {
-    const y = place.current;
-    const back = () => {
-      if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
-    };
-    window.setTimeout(back, 0);
-    window.setTimeout(back, 80);
-    window.setTimeout(back, 280);
-  }
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-3">
       <label className="text-xs text-muted">
         Data
         <input
           type="date"
           value={date}
-          onPointerDown={() => {
-            remember();
-            restore();
-          }}
           onChange={(event) => {
             const next = event.target.value || date;
             onAt(`${next}T${time}`);
-            restore();
           }}
-          className="mt-1 h-11 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
+          className="mt-1 h-10 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
         />
       </label>
       <label className="text-xs text-muted">
@@ -682,16 +657,11 @@ function WhenFields({ at, onAt }: { at: string | null; onAt: (at: string) => voi
         <input
           type="time"
           value={time}
-          onPointerDown={() => {
-            remember();
-            restore();
-          }}
           onChange={(event) => {
             const next = event.target.value || time;
             onAt(`${date}T${next}`);
-            restore();
           }}
-          className="mt-1 h-11 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
+          className="mt-1 h-10 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
         />
       </label>
     </div>
@@ -746,7 +716,7 @@ function PieceDetail({
           type="button"
           aria-label="Fechar"
           onClick={onClose}
-          className="btn btn-icon"
+          className="icon"
         >
           <X aria-hidden="true" />
         </button>
