@@ -31,9 +31,9 @@ export const pieces: Piece[] = data.pieces.map(({ bytes: _bytes, ...piece }) => 
 const order = new Map(products.map((product, index) => [product.id, index]));
 
 export const piecesSorted: Piece[] = [...pieces].sort((a, b) => {
+  if (a.format !== b.format) return a.format === "story" ? -1 : 1;
   const byProduct = (order.get(a.product) ?? 0) - (order.get(b.product) ?? 0);
   if (byProduct) return byProduct;
-  if (a.format !== b.format) return a.format === "story" ? -1 : 1;
   return a.id.localeCompare(b.id, "pt");
 });
 

@@ -12,7 +12,6 @@ import {
   defaultCaptionIndex,
   piecesSorted,
   productById,
-  products,
   type Piece,
 } from "@/data/catalog";
 import { dayKey, loadGrade, phase, saveGrade, stamp, type GradeMap, type Slot } from "@/lib/grade";
@@ -157,12 +156,14 @@ export function GradeApp() {
         </header>
 
         <div className="mt-6 flex flex-col gap-8">
-          {products.map((product) => {
-            const items = piecesSorted.filter((piece) => piece.product === product.id);
+          {(["story", "post"] as const).map((format) => {
+            const items = piecesSorted.filter((piece) => piece.format === format);
             if (items.length === 0) return null;
             return (
-              <section key={product.id} aria-label={product.name}>
-                <h2 className="font-display text-lg uppercase tracking-wide">{product.name}</h2>
+              <section key={format} aria-label={format === "story" ? "Stories" : "Posts"}>
+                <h2 className="font-display text-lg uppercase tracking-wide">
+                  {format === "story" ? "Stories" : "Posts"}
+                </h2>
                 <ul className="mt-3 flex flex-col gap-4">
                   {items.map((piece) => (
                     <li key={piece.id}>
