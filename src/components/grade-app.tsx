@@ -238,7 +238,10 @@ export function GradeApp() {
                           piece={piece}
                           slot={map[piece.id]}
                           now={today}
-                          onOpen={openPieceById}
+                          onAt={(at) => setWhen(piece.id, at)}
+                          onProgram={() => patch(piece.id, { programmed: true })}
+                          onUndo={() => patch(piece.id, { programmed: false })}
+                          onCaption={(caption) => patch(piece.id, { caption })}
                         />
                       </li>
                     ))}
@@ -447,7 +450,7 @@ function DownloadLink({ href }: { href: string }) {
   const id = href.split("/d/")[1]?.split(/[?#]/)[0];
   const file = id ? `https://drive.google.com/uc?export=download&id=${id}` : href;
   return (
-    <a href={file} className="text-act">
+    <a href={file} className="chip">
       Baixar
     </a>
   );
@@ -466,7 +469,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onClick}
-      className="text-act"
+      className="chip"
     >
       {done ? "Copiado" : label}
     </button>
@@ -549,7 +552,7 @@ function ProgramControl({
   const state = phase(slot, now ?? new Date());
   if (state === "aberto") {
     return (
-      <button type="button" onClick={onProgram} className="act">
+      <button type="button" onClick={onProgram} className="chip chip-flame">
         Programado
       </button>
     );
@@ -557,7 +560,7 @@ function ProgramControl({
   return (
     <div className="flex items-center gap-4">
       <p className="text-sm">{state === "postado" ? "Postado" : "Programado"}</p>
-      <button type="button" onClick={onUndo} className="text-act">
+      <button type="button" onClick={onUndo} className="chip">
         Voltar
       </button>
     </div>
@@ -602,19 +605,25 @@ const PieceRow = memo(function PieceRow({
   piece,
   slot,
   now,
-  onOpen,
+  onAt,
+  onProgram,
+  onUndo,
+  onCaption,
 }: {
   piece: Piece;
   slot: Slot | undefined;
   now: Date | null;
-  onOpen: (id: string) => void;
+  onAt: (at: string) => void;
+  onProgram: () => void;
+  onUndo: () => void;
+  onCaption: (caption: number) => void;
 }) {
-  const product = productById(piece.product);
-  const state = phase(slot, now ?? new Date());
+  const { product, index, text, total } = captionOf(piece, slot ? { [piece.id]: slot } : {});
+  const { copied, copy } = useCopy();
   const isStory = piece.format === "story";
-  const mark = state === "postado" ? "Postado" : state === "programado" ? "Programado" : "";
+
   return (
-    <button type="button" onClick={() => onOpen(piece.id)} className="block w-full py-3 text-left">
+    <article className="py-3">
       <img
         src={piece.image}
         alt={`${product.name}, ${isStory ? "story" : "post"}`}
@@ -622,11 +631,40 @@ const PieceRow = memo(function PieceRow({
         decoding="async"
         className="h-auto w-full object-contain"
       />
-      <span className="mt-2 block text-sm">{product.name}</span>
-      <span className="mt-0.5 block text-xs text-muted">
-        {[isStory ? "Story" : "Post", whenLabel(slot?.at), mark].filter(Boolean).join(" · ")}
-      </span>
-    </button>
+      <div className="mt-3 flex items-baseline justify-between gap-3">
+        <p className="text-sm">{product.name}</p>
+        <p className="text-xs uppercase tracking-wide text-muted">{isStory ? "Story" : "Post"}</p>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <DownloadLink href={piece.image} />
+        {isStory ? (
+          <>
+            <CopyButton label="Copiar link" done={copied === "link"} onClick={() => copy("link", STORY_LINK)} />
+            <CopyButton label="Copiar nome" done={copied === "name"} onClick={() => copy("name", STORY_NAME)} />
+          </>
+        ) : (
+          <CopyButton label="Copiar legenda" done={copied === "caption"} onClick={() => copy("caption", text)} />
+        )}
+      </div>
+      {isStory ? (
+        <div className="mt-3">
+          <p className="text-sm">Adesivo de personalização de link para story</p>
+          <p className="mt-1 break-all text-sm text-muted">{STORY_LINK}</p>
+          <p className="mt-1 text-sm">{STORY_NAME}</p>
+        </div>
+      ) : (
+        <div className="mt-3">
+          <CaptionSwitch index={index} total={total} onCaption={onCaption} />
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+        </div>
+      )}
+      <div className="mt-3">
+        <WhenFields at={slot?.at ?? null} onAt={onAt} />
+      </div>
+      <div className="mt-3">
+        <ProgramControl slot={slot} now={now} onProgram={onProgram} onUndo={onUndo} />
+      </div>
+    </article>
   );
 });
 
