@@ -62,6 +62,7 @@ export function GradeApp() {
   const [map, setMap] = useState<GradeMap>({});
   const [today, setToday] = useState<Date | null>(null);
   const [cursor, setCursor] = useState<Date | null>(null);
+  const [layout, setLayout] = useState<"lista" | "grade">("lista");
   const [view, setView] = useState<CalendarView>("semana");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -153,6 +154,22 @@ export function GradeApp() {
               Calendário
             </button>
           </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setLayout("lista")}
+              className={layout === "lista" ? "btn btn-flame flex-1" : "btn btn-soft flex-1"}
+            >
+              Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => setLayout("grade")}
+              className={layout === "grade" ? "btn btn-flame flex-1" : "btn btn-soft flex-1"}
+            >
+              Grade
+            </button>
+          </div>
         </header>
 
         <div className="mt-6 flex flex-col gap-8">
@@ -164,18 +181,34 @@ export function GradeApp() {
                 <h2 className="font-display text-lg uppercase tracking-wide">
                   {format === "story" ? "Stories" : "Posts"}
                 </h2>
-                <ul className="mt-3 flex flex-col gap-4">
+                <ul
+                  className={
+                    layout === "grade"
+                      ? "mt-3 grid grid-cols-2 gap-3 md:grid-cols-3"
+                      : "mt-3 flex flex-col gap-4"
+                  }
+                >
                   {items.map((piece) => (
                     <li key={piece.id}>
-                      <PieceCard
-                        piece={piece}
-                        map={map}
-                        onAt={(at) => setWhen(piece.id, at)}
-                        onProgram={() => patch(piece.id, { programmed: true })}
-                        now={today}
-                        onCaption={(caption) => patch(piece.id, { caption })}
-                        onOpen={() => setOpenId(piece.id)}
-                      />
+                      {layout === "grade" ? (
+                        <GradeTile
+                          piece={piece}
+                          map={map}
+                          now={today}
+                          onOpen={() => setOpenId(piece.id)}
+                        />
+                      ) : (
+                        <PieceCard
+                          piece={piece}
+                          map={map}
+                          onAt={(at) => setWhen(piece.id, at)}
+                          onProgram={() => patch(piece.id, { programmed: true })}
+                          onUndo={() => patch(piece.id, { programmed: false })}
+                          now={today}
+                          onCaption={(caption) => patch(piece.id, { caption })}
+                          onOpen={() => setOpenId(piece.id)}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -203,6 +236,7 @@ export function GradeApp() {
           map={map}
           onAt={(at) => setWhen(openPiece.id, at)}
           onProgram={() => patch(openPiece.id, { programmed: true })}
+          onUndo={() => patch(openPiece.id, { programmed: false })}
           now={today}
           onCaption={(caption) => patch(openPiece.id, { caption })}
           onClose={closeDetail}
@@ -478,17 +512,67 @@ function ProgramControl({
   slot,
   now,
   onProgram,
+  onUndo,
 }: {
   slot: Slot | undefined;
   now: Date | null;
   onProgram: () => void;
+  onUndo: () => void;
 }) {
   const state = phase(slot, now ?? new Date());
-  if (state === "postado") return <p className="btn btn-posted w-full">Postado</p>;
-  if (state === "programado") return <p className="btn btn-soft w-full">Programado</p>;
+  if (state === "aberto") {
+    return (
+      <button type="button" onClick={onProgram} className="btn btn-flame w-full">
+        Programado
+      </button>
+    );
+  }
   return (
-    <button type="button" onClick={onProgram} className="btn btn-flame w-full">
-      Programado
+    <div className="grid grid-cols-2 gap-2">
+      <p className={state === "postado" ? "btn btn-posted" : "btn btn-soft"}>
+        {state === "postado" ? "Postado" : "Programado"}
+      </p>
+      <button type="button" onClick={onUndo} className="btn btn-flame">
+        Voltar
+      </button>
+    </div>
+  );
+}
+
+function GradeTile({
+  piece,
+  map,
+  now,
+  onOpen,
+}: {
+  piece: Piece;
+  map: GradeMap;
+  now: Date | null;
+  onOpen: () => void;
+}) {
+  const product = productById(piece.product);
+  const state = phase(map[piece.id], now ?? new Date());
+  const isStory = piece.format === "story";
+  return (
+    <button type="button" onClick={onOpen} className="w-full overflow-hidden rounded-xl bg-surface text-left">
+      <span className="flex h-40 items-center justify-center bg-ink p-2">
+        <img
+          src={piece.image}
+          alt={`${product.name}, ${isStory ? "story" : "post"}`}
+          className="max-h-full max-w-full object-contain"
+        />
+      </span>
+      <span className="block p-2">
+        <span className="block text-xs font-medium">{product.name}</span>
+        <span className="mt-1 block text-xs uppercase tracking-wide text-muted">
+          {isStory ? "Story" : "Post"}
+        </span>
+        {state !== "aberto" && (
+          <span className={state === "postado" ? "btn btn-posted mt-2 h-8 w-full text-xs" : "btn btn-soft mt-2 h-8 w-full text-xs"}>
+            {state === "postado" ? "Postado" : "Programado"}
+          </span>
+        )}
+      </span>
     </button>
   );
 }
@@ -499,6 +583,7 @@ function PieceCard({
   now,
   onAt,
   onProgram,
+  onUndo,
   onCaption,
   onOpen,
 }: {
@@ -507,6 +592,7 @@ function PieceCard({
   now: Date | null;
   onAt: (at: string) => void;
   onProgram: () => void;
+  onUndo: () => void;
   onCaption: (caption: number) => void;
   onOpen: () => void;
 }) {
@@ -545,7 +631,7 @@ function PieceCard({
           </>
         )}
         <WhenFields at={at} onAt={onAt} />
-        <ProgramControl slot={map[piece.id]} now={now} onProgram={onProgram} />
+        <ProgramControl slot={map[piece.id]} now={now} onProgram={onProgram} onUndo={onUndo} />
       </div>
     </article>
   );
@@ -618,6 +704,7 @@ function PieceDetail({
   now,
   onAt,
   onProgram,
+  onUndo,
   onCaption,
   onClose,
 }: {
@@ -626,6 +713,7 @@ function PieceDetail({
   now: Date | null;
   onAt: (at: string) => void;
   onProgram: () => void;
+  onUndo: () => void;
   onCaption: (caption: number) => void;
   onClose: () => void;
 }) {
@@ -680,7 +768,7 @@ function PieceDetail({
           </>
         )}
         <WhenFields at={at} onAt={onAt} />
-        <ProgramControl slot={map[piece.id]} now={now} onProgram={onProgram} />
+        <ProgramControl slot={map[piece.id]} now={now} onProgram={onProgram} onUndo={onUndo} />
       </div>
     </div>
   );
