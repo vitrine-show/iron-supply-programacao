@@ -76,7 +76,7 @@ export function GradeApp() {
   const [map, setMap] = useState<GradeMap>({});
   const [today, setToday] = useState<Date | null>(null);
   const [cursor, setCursor] = useState<Date | null>(null);
-  const [layout, setLayout] = useState<"lista" | "grade">("grade");
+  const [layout, setLayout] = useState<"lista" | "grade">("lista");
   const [view, setView] = useState<CalendarView>("semana");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -231,9 +231,9 @@ export function GradeApp() {
                     ))}
                   </ul>
                 ) : (
-                  <ul className="mt-1">
+                  <ul className="mt-2 flex flex-col gap-6">
                     {items.map((piece) => (
-                      <li key={piece.id} className="border-b border-line">
+                      <li key={piece.id}>
                         <PieceRow
                           piece={piece}
                           slot={map[piece.id]}
@@ -438,7 +438,7 @@ function CalendarSheet({
 function Shot({ src, alt }: { src: string; alt: string }) {
   return (
     <div className="flex items-center justify-center bg-ink px-3 py-3">
-      <img src={thumb(src, 1200)} alt={alt} decoding="async" className="max-h-[70vh] w-auto max-w-full object-contain" />
+      <img src={src} alt={alt} decoding="async" className="h-auto w-full object-contain" />
     </div>
   );
 }
@@ -614,19 +614,17 @@ const PieceRow = memo(function PieceRow({
   const isStory = piece.format === "story";
   const mark = state === "postado" ? "Postado" : state === "programado" ? "Programado" : "";
   return (
-    <button type="button" onClick={() => onOpen(piece.id)} className="flex w-full items-center gap-3 py-2 text-left">
+    <button type="button" onClick={() => onOpen(piece.id)} className="block w-full py-3 text-left">
       <img
-        src={thumb(piece.image, 240)}
-        alt=""
+        src={piece.image}
+        alt={`${product.name}, ${isStory ? "story" : "post"}`}
         loading="lazy"
         decoding="async"
-        className="h-16 w-12 object-contain"
+        className="h-auto w-full object-contain"
       />
-      <span className="min-w-0">
-        <span className="block truncate text-sm">{product.name}</span>
-        <span className="mt-0.5 block text-xs text-muted">
-          {[isStory ? "Story" : "Post", whenLabel(slot?.at), mark].filter(Boolean).join(" · ")}
-        </span>
+      <span className="mt-2 block text-sm">{product.name}</span>
+      <span className="mt-0.5 block text-xs text-muted">
+        {[isStory ? "Story" : "Post", whenLabel(slot?.at), mark].filter(Boolean).join(" · ")}
       </span>
     </button>
   );
