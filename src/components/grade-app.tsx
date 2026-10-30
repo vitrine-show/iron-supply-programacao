@@ -131,18 +131,11 @@ export function GradeApp() {
       const next: GradeMap = { ...local, ...remote };
       for (const piece of piecesSorted) {
         const slot = next[piece.id];
-        if (slot?.at) {
-          next[piece.id] = {
-            at: slot.at,
-            caption: firstCaption(piece, slot?.caption),
-            programmed: Boolean(slot.programmed),
-          };
-          continue;
-        }
+        const programmed = Boolean(slot?.programmed);
         next[piece.id] = {
-          at: stamp(now),
+          at: programmed && slot?.at ? slot.at : null,
           caption: firstCaption(piece, slot?.caption),
-          programmed: false,
+          programmed,
         };
       }
       setMap(next);
@@ -691,7 +684,7 @@ const PieceRow = memo(function PieceRow({
         </div>
       )}
       <div className="mt-3">
-        <WhenFields at={slot?.at ?? null} onAt={onAt} />
+        <WhenFields at={slot?.at ?? null} now={now} onAt={onAt} />
       </div>
       <div className="mt-3">
         <ProgramControl slot={slot} now={now} onProgram={onProgram} onUndo={onUndo} />
@@ -700,11 +693,19 @@ const PieceRow = memo(function PieceRow({
   );
 });
 
-function WhenFields({ at, onAt }: { at: string | null; onAt: (at: string) => void }) {
-  const now = stamp(new Date());
-  const value = at || now;
+function WhenFields({
+  at,
+  now,
+  onAt,
+}: {
+  at: string | null;
+  now: Date | null;
+  onAt: (at: string) => void;
+}) {
+  const live = stamp(now ?? new Date());
+  const value = at || live;
   const date = value.slice(0, 10);
-  const time = value.slice(11, 16);
+  const time = value.slice(11, 16) || live.slice(11, 16);
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -805,7 +806,7 @@ function PieceDetail({
             />
           </>
         )}
-        <WhenFields at={at} onAt={onAt} />
+        <WhenFields at={at} now={now} onAt={onAt} />
         <ProgramControl slot={map[piece.id]} now={now} onProgram={onProgram} onUndo={onUndo} />
       </div>
     </div>
