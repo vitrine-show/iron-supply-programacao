@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   addDays,
   endOfWeek,
@@ -555,16 +555,20 @@ function WhenFields({ at, onAt }: { at: string | null; onAt: (at: string) => voi
   const value = at || now;
   const date = value.slice(0, 10);
   const time = value.slice(11, 16);
+  const place = useRef(0);
 
-  function holdScroll(event: React.PointerEvent<HTMLInputElement>) {
-    const y = window.scrollY;
-    const restore = () => {
+  function remember() {
+    place.current = window.scrollY;
+  }
+
+  function restore() {
+    const y = place.current;
+    const back = () => {
       if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
     };
-    window.setTimeout(restore, 0);
-    window.setTimeout(restore, 80);
-    window.setTimeout(restore, 280);
-    event.currentTarget.addEventListener("blur", restore, { once: true });
+    window.setTimeout(back, 0);
+    window.setTimeout(back, 80);
+    window.setTimeout(back, 280);
   }
 
   return (
@@ -574,10 +578,14 @@ function WhenFields({ at, onAt }: { at: string | null; onAt: (at: string) => voi
         <input
           type="date"
           value={date}
-          onPointerDown={holdScroll}
+          onPointerDown={() => {
+            remember();
+            restore();
+          }}
           onChange={(event) => {
             const next = event.target.value || date;
             onAt(`${next}T${time}`);
+            restore();
           }}
           className="mt-1 h-11 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
         />
@@ -587,10 +595,14 @@ function WhenFields({ at, onAt }: { at: string | null; onAt: (at: string) => voi
         <input
           type="time"
           value={time}
-          onPointerDown={holdScroll}
+          onPointerDown={() => {
+            remember();
+            restore();
+          }}
           onChange={(event) => {
             const next = event.target.value || time;
             onAt(`${date}T${next}`);
+            restore();
           }}
           className="mt-1 h-11 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
         />
