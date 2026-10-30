@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #090909;
+  --color-surface: #161616;
+  --color-fg: #f3efe8;
+  --color-muted: #8f8a83;
+  --color-flame: #ff5a1f;
+  --color-line: #2a2a2a;
+  --font-sans: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Oswald", ui-sans-serif, sans-serif;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html,
+  body {
+    background: var(--color-ink);
+    color: var(--color-fg);
+  }
+
+  input[type="date"],
+  input[type="time"] {
+    color-scheme: dark;
+    font-size: 16px;
+  }
+
+  html {
+    overflow-anchor: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-flame);
+    outline-offset: 2px;
+  }
+}
+
+.shot-full {
+  max-height: 70vh;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #3a3028;
+  color: #f6efe6;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 #241c16;
+}
+
+.btn-flame {
+  background: #ff5a1f;
+  color: #1c0d07;
+  box-shadow: inset 0 -2px 0 #c2410c;
+}
+
+.btn-soft {
+  background: #2a231c;
+  color: #f3efe8;
+  box-shadow: inset 0 -2px 0 #1a1511;
+}
+
+.btn-posted {
+  background: #1d3b31;
+  color: #d7f3e6;
+  box-shadow: inset 0 -2px 0 #10241d;
+}
+
+.btn-icon {
+  width: 44px;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}
