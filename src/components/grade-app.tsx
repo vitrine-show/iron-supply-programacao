@@ -180,54 +180,63 @@ export function GradeApp() {
       <div className="mx-auto max-w-6xl px-4 pt-4 pb-12">
         <header>
           <img src="/marca.png" alt="Iron Supply" className="mx-auto h-14 w-auto" />
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <h1 className="font-display text-xl uppercase leading-none tracking-wide">Programação</h1>
-            <div className="flex items-center gap-1">
+          <div className="sticky top-0 z-20 -mx-4 mt-4 bg-ink px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="font-display text-xl uppercase leading-none tracking-wide">Programação</h1>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Lista"
+                  aria-pressed={layout === "lista"}
+                  onClick={() => setLayout("lista")}
+                  className={layout === "lista" ? "icon on" : "icon"}
+                >
+                  <List aria-hidden="true" size={18} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Grade"
+                  aria-pressed={layout === "grade"}
+                  onClick={() => setLayout("grade")}
+                  className={layout === "grade" ? "icon on" : "icon"}
+                >
+                  <LayoutGrid aria-hidden="true" size={18} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Calendário"
+                  onClick={() => setCalendarOpen(true)}
+                  className="icon"
+                >
+                  <Calendar aria-hidden="true" size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              {(
+                [
+                  ["story", "Story"],
+                  ["post", "Post"],
+                  ["tudo", "Tudo"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setFiltro(id)}
+                  className={filtro === id ? "chip chip-flame" : "chip"}
+                >
+                  {label}
+                </button>
+              ))}
               <button
                 type="button"
-                aria-label="Lista"
-                aria-pressed={layout === "lista"}
-                onClick={() => setLayout("lista")}
-                className={layout === "lista" ? "icon on" : "icon"}
+                className="chip ml-auto"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
               >
-                <List aria-hidden="true" size={18} />
-              </button>
-              <button
-                type="button"
-                aria-label="Grade"
-                aria-pressed={layout === "grade"}
-                onClick={() => setLayout("grade")}
-                className={layout === "grade" ? "icon on" : "icon"}
-              >
-                <LayoutGrid aria-hidden="true" size={18} />
-              </button>
-              <button
-                type="button"
-                aria-label="Calendário"
-                onClick={() => setCalendarOpen(true)}
-                className="icon"
-              >
-                <Calendar aria-hidden="true" size={18} />
+                Subir
               </button>
             </div>
-          </div>
-          <div className="mt-4 flex gap-2">
-            {(
-              [
-                ["story", "Story"],
-                ["post", "Post"],
-                ["tudo", "Tudo"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setFiltro(id)}
-                className={filtro === id ? "chip chip-flame" : "chip"}
-              >
-                {label}
-              </button>
-            ))}
           </div>
         </header>
 
