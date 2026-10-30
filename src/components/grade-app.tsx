@@ -176,7 +176,7 @@ export function GradeApp() {
   const openPiece = piecesSorted.find((piece) => piece.id === openId) ?? null;
 
   return (
-    <main className="min-h-dvh bg-ink text-fg">
+    <main className="bg-ink text-fg">
       <div className="mx-auto max-w-6xl px-4 pt-4 pb-12">
         <header>
           <img src="/marca.png" alt="Iron Supply" className="mx-auto h-14 w-auto" />
@@ -612,6 +612,8 @@ const PieceThumb = memo(function PieceThumb({
         <img
           src={thumb(piece.image, 480)}
           alt={`${product.name}, ${isStory ? "story" : "post"}`}
+          width={piece.w}
+          height={piece.h}
           loading="lazy"
           decoding="async"
           className="max-h-full max-w-full object-contain"
@@ -652,9 +654,12 @@ const PieceRow = memo(function PieceRow({
       <img
         src={piece.image}
         alt={`${product.name}, ${isStory ? "story" : "post"}`}
+        width={piece.w}
+        height={piece.h}
         loading="lazy"
         decoding="async"
-        className="h-auto w-full object-contain"
+        className="block h-auto w-full bg-ink object-contain"
+        style={{ aspectRatio: `${piece.w} / ${piece.h}` }}
       />
       <div className="mt-3 flex items-baseline justify-between gap-3">
         <p className="text-sm">{product.name}</p>

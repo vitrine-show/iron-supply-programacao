@@ -29,10 +29,6 @@
     font-size: 16px;
   }
 
-  html {
-    overflow-anchor: none;
-  }
-
   :focus-visible {
     outline: 2px solid var(--color-flame);
     outline-offset: 2px;
