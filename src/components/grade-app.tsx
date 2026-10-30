@@ -16,6 +16,7 @@ import {
 } from "@/data/catalog";
 import { dayKey, loadGrade, phase, saveGrade, stamp, type GradeMap, type Slot } from "@/lib/grade";
 import { pullProgramacao, pushProgramacao } from "@/lib/programacao";
+import { emptyPanel, pullFila, pushFila, pushUltima, type RobotPanel } from "@/lib/fila";
 
 const STORY_LINK = "https://wa.me/5531988551275";
 const STORY_NAME = "FAÇA SEU PEDIDO PELO WHATSAPP";
@@ -83,7 +84,7 @@ function useCopy() {
   return { copied, copy };
 }
 
-export function GradeApp({ cardId = null }: { cardId?: string | null }) {
+export function GradeApp({ cardId = null, robo = false }: { cardId?: string | null; robo?: boolean }) {
   const [map, setMap] = useState<GradeMap>({});
   const [today, setToday] = useState<Date | null>(null);
   const [cursor, setCursor] = useState<Date | null>(null);
@@ -93,6 +94,11 @@ export function GradeApp({ cardId = null }: { cardId?: string | null }) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [synced, setSynced] = useState(false);
+  const [filaReady, setFilaReady] = useState(false);
+  const [order, setOrder] = useState<string[]>(() => piecesSorted.map((piece) => piece.id));
+  const [released, setReleased] = useState<Record<string, boolean>>({});
+  const [panel, setPanel] = useState<RobotPanel>(emptyPanel);
+  const [lastCaption, setLastCaption] = useState<Record<string, number>>({});
   const closeDetail = useCallback(() => setOpenId(null), []);
   const openPieceById = useCallback((id: string) => setOpenId(id), []);
 
@@ -143,6 +149,17 @@ export function GradeApp({ cardId = null }: { cardId?: string | null }) {
       setToday(now);
       setCursor(now);
       setSynced(true);
+      try {
+        const fila = await pullFila();
+        if (cancel) return;
+        setOrder(fila.order);
+        setReleased(fila.released);
+        setPanel(fila.panel);
+        setLastCaption(fila.last);
+      } catch {
+        // A fila nova pode falhar sem apagar a programação.
+      }
+      if (!cancel) setFilaReady(true);
     })();
     return () => {
       cancel = true;
@@ -157,6 +174,14 @@ export function GradeApp({ cardId = null }: { cardId?: string | null }) {
     }, 400);
     return () => window.clearTimeout(timer);
   }, [map, synced]);
+
+  useEffect(() => {
+    if (!filaReady) return;
+    const timer = window.setTimeout(() => {
+      void pushFila(order, released, panel).catch(() => undefined);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [order, released, panel, filaReady]);
 
   function patch(id: string, next: Partial<{ at: string | null; caption: number; programmed: boolean; chosen: boolean }>) {
     setMap((current) => {
@@ -175,8 +200,42 @@ export function GradeApp({ cardId = null }: { cardId?: string | null }) {
     patch(id, { at, programmed: false });
   }
 
+  function movePiece(id: string, dir: -1 | 1) {
+    setOrder((current) => {
+      const index = current.indexOf(id);
+      const to = index + dir;
+      if (index < 0 || to < 0 || to >= current.length) return current;
+      const next = current.slice();
+      const [item] = next.splice(index, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }
+
+  function chooseCaption(piece: Piece, caption: number) {
+    patch(piece.id, { caption });
+    setLastCaption((current) => ({ ...current, [piece.product]: caption }));
+    void pushUltima(piece.product, caption).catch(() => undefined);
+  }
+
   const openPiece = piecesSorted.find((piece) => piece.id === openId) ?? null;
   const solo = cardId ? piecesSorted.find((piece) => piece.id === cardId) ?? null : null;
+  const ordered = order
+    .map((id) => piecesSorted.find((piece) => piece.id === id))
+    .filter((piece): piece is Piece => Boolean(piece))
+    .filter((piece) => filtro === "tudo" || piece.format === filtro);
+
+  if (robo) {
+    return (
+      <RoboScreen
+        order={order}
+        released={released}
+        panel={panel}
+        map={map}
+        onProgram={(id) => patch(id, { programmed: true })}
+      />
+    );
+  }
 
   if (solo) {
     return (
@@ -238,9 +297,12 @@ export function GradeApp({ cardId = null }: { cardId?: string | null }) {
                 {label}
               </button>
             ))}
+            <a className="chip ml-auto" href="/?robo=1">
+              Robô
+            </a>
             <button
               type="button"
-              className="chip ml-auto"
+              className="chip"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             >
               Subir
@@ -251,51 +313,82 @@ export function GradeApp({ cardId = null }: { cardId?: string | null }) {
       <div className="mx-auto max-w-6xl px-4 pt-28 pb-12">
         <img src="/marca.png" alt="Iron Supply" className="mx-auto h-14 w-auto" />
 
-        <div className="mt-6 flex flex-col gap-8">
-          {(["story", "post"] as const)
-            .filter((format) => filtro === "tudo" || filtro === format)
-            .map((format) => {
-            const items = piecesSorted.filter((piece) => piece.format === format);
-            if (items.length === 0) return null;
-            return (
-              <section key={format} aria-label={format === "story" ? "Stories" : "Posts"}>
-                <h2 className="text-xs uppercase tracking-[0.16em] text-muted">
-                  {format === "story" ? "Stories" : "Posts"}
-                </h2>
-                {layout === "grade" ? (
-                  <ul className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
-                    {items.map((piece) => (
-                      <li key={piece.id}>
-                        <PieceThumb
-                          piece={piece}
-                          slot={map[piece.id]}
-                          now={today}
-                          onOpen={openPieceById}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <ul className="mt-2 flex flex-col gap-6">
-                    {items.map((piece) => (
-                      <li key={piece.id}>
-                        <PieceRow
-                          piece={piece}
-                          slot={map[piece.id]}
-                          now={today}
-                          onAt={(at) => setWhen(piece.id, at)}
-                          onProgram={() => patch(piece.id, { programmed: true })}
-                          onUndo={() => patch(piece.id, { programmed: false })}
-                          onCaption={(caption) => patch(piece.id, { caption, chosen: false })}
-                          onChosen={(chosen) => patch(piece.id, { chosen })}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            );
-          })}
+        <section className="mt-6 rounded-xl bg-surface p-3">
+          <h2 className="text-sm">Painel do robô</h2>
+          <p className="mt-1 text-xs text-muted">Se ficar vazio, não aparece para ele.</p>
+          <label className="mt-3 block text-xs text-muted">
+            Título
+            <input
+              value={panel.title}
+              onChange={(event) => setPanel((current) => ({ ...current, title: event.target.value }))}
+              className="mt-1 h-10 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
+            />
+          </label>
+          <label className="mt-3 block text-xs text-muted">
+            Destaque
+            <input
+              value={panel.highlight}
+              onChange={(event) => setPanel((current) => ({ ...current, highlight: event.target.value }))}
+              className="mt-1 h-10 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
+            />
+          </label>
+          <label className="mt-3 block text-xs text-muted">
+            Texto
+            <textarea
+              value={panel.text}
+              rows={3}
+              onChange={(event) => setPanel((current) => ({ ...current, text: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-line bg-ink px-2 py-2 text-base text-fg"
+            />
+          </label>
+          <label className="mt-3 block text-xs text-muted">
+            Link
+            <input
+              value={panel.link}
+              onChange={(event) => setPanel((current) => ({ ...current, link: event.target.value }))}
+              className="mt-1 h-10 w-full rounded-lg border border-line bg-ink px-2 text-base text-fg"
+            />
+          </label>
+        </section>
+
+        <div className="mt-6">
+          {layout === "grade" ? (
+            <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {ordered.map((piece) => (
+                <li key={piece.id}>
+                  <PieceThumb piece={piece} slot={map[piece.id]} now={today} onOpen={openPieceById} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="flex flex-col gap-6">
+              {ordered.map((piece) => {
+                const index = order.indexOf(piece.id);
+                return (
+                  <li key={piece.id}>
+                    <PieceRow
+                      piece={piece}
+                      slot={map[piece.id]}
+                      now={today}
+                      released={Boolean(released[piece.id])}
+                      lastCaption={lastCaption[piece.product]}
+                      canUp={index > 0}
+                      canDown={index >= 0 && index < order.length - 1}
+                      onAt={(at) => setWhen(piece.id, at)}
+                      onProgram={() => patch(piece.id, { programmed: true })}
+                      onUndo={() => patch(piece.id, { programmed: false })}
+                      onCaption={(caption) => chooseCaption(piece, caption)}
+                      onRelease={() =>
+                        setReleased((current) => ({ ...current, [piece.id]: !current[piece.id] }))
+                      }
+                      onUp={() => movePiece(piece.id, -1)}
+                      onDown={() => movePiece(piece.id, 1)}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
 
@@ -319,8 +412,7 @@ export function GradeApp({ cardId = null }: { cardId?: string | null }) {
           onProgram={() => patch(openPiece.id, { programmed: true })}
           onUndo={() => patch(openPiece.id, { programmed: false })}
           now={today}
-          onCaption={(caption) => patch(openPiece.id, { caption, chosen: false })}
-          onChosen={(chosen) => patch(openPiece.id, { chosen })}
+          onCaption={(caption) => chooseCaption(openPiece, caption)}
           onClose={closeDetail}
         />
       )}
@@ -682,20 +774,32 @@ const PieceRow = memo(function PieceRow({
   piece,
   slot,
   now,
+  released,
+  lastCaption,
+  canUp,
+  canDown,
   onAt,
   onProgram,
   onUndo,
   onCaption,
-  onChosen,
+  onRelease,
+  onUp,
+  onDown,
 }: {
   piece: Piece;
   slot: Slot | undefined;
   now: Date | null;
+  released: boolean;
+  lastCaption: number | undefined;
+  canUp: boolean;
+  canDown: boolean;
   onAt: (at: string) => void;
   onProgram: () => void;
   onUndo: () => void;
   onCaption: (caption: number) => void;
-  onChosen: (chosen: boolean) => void;
+  onRelease: () => void;
+  onUp: () => void;
+  onDown: () => void;
 }) {
   const { product, index, text, total } = captionOf(piece, slot ? { [piece.id]: slot } : {});
   const { copied, copy } = useCopy();
@@ -762,18 +866,22 @@ const PieceRow = memo(function PieceRow({
         </div>
       ) : (
         <div className="mt-3">
-          <CaptionPanel
-            index={index}
-            total={total}
-            text={text}
-            chosen={Boolean(slot?.chosen)}
-            onCaption={onCaption}
-            onChosen={onChosen}
-          />
+          <CaptionPanel index={index} total={total} text={text} lastCaption={lastCaption} onCaption={onCaption} />
         </div>
       )}
       <div className="mt-3">
         <WhenFields at={slot?.at ?? null} now={now} onAt={onAt} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="chip" onClick={onUp} disabled={!canUp}>
+          Subir
+        </button>
+        <button type="button" className="chip" onClick={onDown} disabled={!canDown}>
+          Descer
+        </button>
+        <button type="button" className={released ? "chip chip-flame" : "chip"} onClick={onRelease}>
+          {released ? "Liberado" : "Liberar"}
+        </button>
       </div>
       <div className="mt-3">
         <ProgramControl slot={slot} now={now} onProgram={onProgram} onUndo={onUndo} />
@@ -786,37 +894,125 @@ function CaptionPanel({
   index,
   total,
   text,
-  chosen,
+  lastCaption,
   onCaption,
-  onChosen,
 }: {
   index: number;
   total: number;
   text: string;
-  chosen: boolean;
+  lastCaption?: number;
   onCaption: (caption: number) => void;
-  onChosen: (chosen: boolean) => void;
 }) {
-  if (chosen) {
-    return (
-      <div>
-        <p className="somente-robo" data-legenda-selecionada="">
-          {text}
-        </p>
-        <button type="button" className="chip" onClick={() => onChosen(false)}>
-          Ver legenda
-        </button>
-      </div>
-    );
-  }
   return (
     <div>
+      {typeof lastCaption === "number" ? (
+        <p className="mb-2 text-xs text-muted">Última legenda deste produto: {lastCaption + 1}</p>
+      ) : null}
       <CaptionSwitch index={index} total={total} onCaption={onCaption} />
       <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
-      <button type="button" className="chip mt-2" onClick={() => onChosen(true)}>
-        Selecionar
-      </button>
     </div>
+  );
+}
+
+function RoboScreen({
+  order,
+  released,
+  panel,
+  map,
+  onProgram,
+}: {
+  order: string[];
+  released: Record<string, boolean>;
+  panel: RobotPanel;
+  map: GradeMap;
+  onProgram: (id: string) => void;
+}) {
+  const queue = order.filter((id) => released[id]);
+  const done = queue.filter((id) => map[id]?.programmed).length;
+  const currentId = queue.find((id) => !map[id]?.programmed) ?? null;
+  const piece = currentId ? piecesSorted.find((item) => item.id === currentId) ?? null : null;
+  const product = piece ? productById(piece.product) : null;
+  const text = piece ? captionOf(piece, map).text : "";
+  const showPanel = Boolean(panel.title.trim() || panel.highlight.trim() || panel.text.trim() || panel.link.trim());
+
+  return (
+    <main className="bg-ink text-fg">
+      <div className="mx-auto max-w-2xl px-4 py-4 pb-16">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="font-display text-xl uppercase tracking-wide">Robô</h1>
+          <a className="chip" href="/">
+            Painel
+          </a>
+        </div>
+        {showPanel ? (
+          <section className="mt-4 rounded-xl border border-line bg-surface p-3">
+            {panel.title ? <p className="text-sm">{panel.title}</p> : null}
+            {panel.highlight ? <p className="mt-1 text-sm text-flame">{panel.highlight}</p> : null}
+            {panel.text ? <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{panel.text}</p> : null}
+            {panel.link ? (
+              <a className="mt-2 block break-all text-sm text-flame" href={panel.link}>
+                {panel.link}
+              </a>
+            ) : null}
+          </section>
+        ) : null}
+        <div className="mt-4">
+          <div className="h-1.5 overflow-hidden rounded-full bg-line">
+            <div className="h-full bg-flame" style={{ width: queue.length ? `${(done / queue.length) * 100}%` : "0%" }} />
+          </div>
+          <p className="mt-2 text-xs text-muted">{queue.length ? `${done} de ${queue.length}` : "Nada liberado"}</p>
+        </div>
+        {!queue.length ? (
+          <p className="mt-8 text-sm">Nada liberado no painel.</p>
+        ) : !piece || !product ? (
+          <p className="mt-8 font-display text-2xl uppercase tracking-wide">Finalizou</p>
+        ) : (
+          <article className="mt-4 rounded-xl bg-surface p-3">
+            <img
+              src={piece.image}
+              alt={`${product.name}, ${piece.format === "story" ? "story" : "post"}`}
+              width={piece.w}
+              height={piece.h}
+              className="block h-auto w-full bg-ink object-contain"
+              style={{ aspectRatio: `${piece.w} / ${piece.h}` }}
+            />
+            <p className="mt-3 text-sm">{product.name}</p>
+            <p className="mt-1 text-sm text-muted">{whenLabel(map[piece.id]?.at)}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a className="chip" href={piece.image} download>
+                Baixar
+              </a>
+              {piece.format === "story" ? (
+                <>
+                  <button type="button" className="chip" onClick={() => writeClipboard(STORY_LINK)}>
+                    Copiar link
+                  </button>
+                  <button type="button" className="chip" onClick={() => writeClipboard(STORY_NAME)}>
+                    Copiar nome
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="chip" onClick={() => writeClipboard(text)}>
+                  Copiar legenda
+                </button>
+              )}
+            </div>
+            {piece.format === "story" ? (
+              <div className="mt-3">
+                <p className="text-sm">Adesivo de personalização de link para story</p>
+                <p className="mt-1 break-all text-sm text-muted">{STORY_LINK}</p>
+                <p className="mt-1 text-sm">{STORY_NAME}</p>
+              </div>
+            ) : (
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+            )}
+            <button type="button" className="chip chip-flame mt-4" onClick={() => onProgram(piece.id)}>
+              Programado
+            </button>
+          </article>
+        )}
+      </div>
+    </main>
   );
 }
 
@@ -872,7 +1068,6 @@ function PieceDetail({
   onProgram,
   onUndo,
   onCaption,
-  onChosen,
   onClose,
 }: {
   piece: Piece;
@@ -882,7 +1077,6 @@ function PieceDetail({
   onProgram: () => void;
   onUndo: () => void;
   onCaption: (caption: number) => void;
-  onChosen: (chosen: boolean) => void;
   onClose: () => void;
 }) {
   const at = map[piece.id]?.at ?? null;
@@ -926,14 +1120,7 @@ function PieceDetail({
           <StoryBlock />
         ) : (
           <>
-            <CaptionPanel
-              index={index}
-              total={total}
-              text={text}
-              chosen={Boolean(map[piece.id]?.chosen)}
-              onCaption={onCaption}
-              onChosen={onChosen}
-            />
+            <CaptionPanel index={index} total={total} text={text} onCaption={onCaption} />
             <CopyButton
               label="Copiar legenda"
               done={copied === "caption"}
