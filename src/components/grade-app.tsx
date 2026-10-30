@@ -144,7 +144,7 @@ export function GradeApp() {
     <main className="min-h-dvh bg-ink text-fg">
       <div className="mx-auto max-w-6xl px-4 pt-4 pb-12">
         <header>
-          <img src="/marca.jpg" alt="Iron Supply" className="mx-auto h-14 w-auto" />
+          <img src="/marca.png" alt="Iron Supply" className="mx-auto h-14 w-auto" />
           <div className="mt-4 flex items-center justify-between gap-3">
             <div>
               <h1 className="font-display text-xl uppercase leading-none tracking-wide">Programação</h1>
