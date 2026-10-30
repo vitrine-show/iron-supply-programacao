@@ -25,6 +25,7 @@ function slotOf(row: Row): Slot {
     at: row.scheduled_at,
     caption: row.caption_index ?? 0,
     programmed: Boolean(row.programmed),
+    chosen: false,
   };
 }
 

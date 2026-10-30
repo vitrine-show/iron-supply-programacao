@@ -2,6 +2,7 @@ export type Slot = {
   at: string | null;
   caption: number;
   programmed: boolean;
+  chosen: boolean;
 };
 
 export type GradeMap = Record<string, Slot>;
@@ -21,6 +22,7 @@ export function loadGrade(): GradeMap {
         at: typeof slot.at === "string" ? slot.at : null,
         caption: typeof slot.caption === "number" ? slot.caption : 0,
         programmed: Boolean(slot.programmed),
+        chosen: Boolean(slot.chosen),
       };
     }
     return map;

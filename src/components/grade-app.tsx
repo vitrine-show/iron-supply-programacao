@@ -136,6 +136,7 @@ export function GradeApp() {
           at: programmed && slot?.at ? slot.at : null,
           caption: firstCaption(piece, slot?.caption),
           programmed,
+          chosen: Boolean(local[piece.id]?.chosen),
         };
       }
       setMap(next);
@@ -157,13 +158,14 @@ export function GradeApp() {
     return () => window.clearTimeout(timer);
   }, [map, synced]);
 
-  function patch(id: string, next: Partial<{ at: string | null; caption: number; programmed: boolean }>) {
+  function patch(id: string, next: Partial<{ at: string | null; caption: number; programmed: boolean; chosen: boolean }>) {
     setMap((current) => {
       const piece = piecesSorted.find((item) => item.id === id);
       const prev = current[id] ?? {
         at: null,
         caption: piece ? defaultCaptionIndex(piece) : 0,
         programmed: false,
+        chosen: false,
       };
       return { ...current, [id]: { ...prev, ...next } };
     });
@@ -275,7 +277,8 @@ export function GradeApp() {
                           onAt={(at) => setWhen(piece.id, at)}
                           onProgram={() => patch(piece.id, { programmed: true })}
                           onUndo={() => patch(piece.id, { programmed: false })}
-                          onCaption={(caption) => patch(piece.id, { caption })}
+                          onCaption={(caption) => patch(piece.id, { caption, chosen: false })}
+                          onChosen={(chosen) => patch(piece.id, { chosen })}
                         />
                       </li>
                     ))}
@@ -307,7 +310,8 @@ export function GradeApp() {
           onProgram={() => patch(openPiece.id, { programmed: true })}
           onUndo={() => patch(openPiece.id, { programmed: false })}
           now={today}
-          onCaption={(caption) => patch(openPiece.id, { caption })}
+          onCaption={(caption) => patch(openPiece.id, { caption, chosen: false })}
+          onChosen={(chosen) => patch(openPiece.id, { chosen })}
           onClose={closeDetail}
         />
       )}
@@ -645,6 +649,7 @@ const PieceRow = memo(function PieceRow({
   onProgram,
   onUndo,
   onCaption,
+  onChosen,
 }: {
   piece: Piece;
   slot: Slot | undefined;
@@ -653,6 +658,7 @@ const PieceRow = memo(function PieceRow({
   onProgram: () => void;
   onUndo: () => void;
   onCaption: (caption: number) => void;
+  onChosen: (chosen: boolean) => void;
 }) {
   const { product, index, text, total } = captionOf(piece, slot ? { [piece.id]: slot } : {});
   const { copied, copy } = useCopy();
@@ -693,8 +699,14 @@ const PieceRow = memo(function PieceRow({
         </div>
       ) : (
         <div className="mt-3">
-          <CaptionSwitch index={index} total={total} onCaption={onCaption} />
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+          <CaptionPanel
+            index={index}
+            total={total}
+            text={text}
+            chosen={Boolean(slot?.chosen)}
+            onCaption={onCaption}
+            onChosen={onChosen}
+          />
         </div>
       )}
       <div className="mt-3">
@@ -706,6 +718,44 @@ const PieceRow = memo(function PieceRow({
     </article>
   );
 });
+
+function CaptionPanel({
+  index,
+  total,
+  text,
+  chosen,
+  onCaption,
+  onChosen,
+}: {
+  index: number;
+  total: number;
+  text: string;
+  chosen: boolean;
+  onCaption: (caption: number) => void;
+  onChosen: (chosen: boolean) => void;
+}) {
+  if (chosen) {
+    return (
+      <div>
+        <p className="somente-robo" data-legenda-selecionada="">
+          {text}
+        </p>
+        <button type="button" className="chip" onClick={() => onChosen(false)}>
+          Ver legenda
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <CaptionSwitch index={index} total={total} onCaption={onCaption} />
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+      <button type="button" className="chip mt-2" onClick={() => onChosen(true)}>
+        Selecionar
+      </button>
+    </div>
+  );
+}
 
 function WhenFields({
   at,
@@ -759,6 +809,7 @@ function PieceDetail({
   onProgram,
   onUndo,
   onCaption,
+  onChosen,
   onClose,
 }: {
   piece: Piece;
@@ -768,6 +819,7 @@ function PieceDetail({
   onProgram: () => void;
   onUndo: () => void;
   onCaption: (caption: number) => void;
+  onChosen: (chosen: boolean) => void;
   onClose: () => void;
 }) {
   const at = map[piece.id]?.at ?? null;
@@ -811,8 +863,14 @@ function PieceDetail({
           <StoryBlock />
         ) : (
           <>
-            <CaptionSwitch index={index} total={total} onCaption={onCaption} />
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+            <CaptionPanel
+              index={index}
+              total={total}
+              text={text}
+              chosen={Boolean(map[piece.id]?.chosen)}
+              onCaption={onCaption}
+              onChosen={onChosen}
+            />
             <CopyButton
               label="Copiar legenda"
               done={copied === "caption"}
