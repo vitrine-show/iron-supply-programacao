@@ -9,7 +9,6 @@ artifacts
 screenshots
 attachments
 public/pecas
-public/marca.jpg
 .vercel
 *.log
 .DS_Store
