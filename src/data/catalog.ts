@@ -43,11 +43,6 @@ export function productById(id: string): Product {
   return product;
 }
 
-export function defaultCaptionIndex(piece: Piece): number {
-  const posts = piecesSorted.filter(
-    (item) => item.product === piece.product && item.format === "post",
-  );
-  const index = Math.max(0, posts.findIndex((item) => item.id === piece.id));
-  const total = productById(piece.product).captions.length;
-  return total ? index % total : 0;
+export function defaultCaptionIndex(_piece: Piece): number {
+  return 0;
 }

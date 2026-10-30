@@ -40,6 +40,17 @@ function whenLabel(at: string | null | undefined) {
   return `${at.slice(8, 10)}/${at.slice(5, 7)} · ${at.slice(11, 16)}`;
 }
 
+function firstCaption(piece: Piece, stored: number | undefined) {
+  const posts = piecesSorted.filter(
+    (item) => item.product === piece.product && item.format === "post",
+  );
+  const spread = Math.max(0, posts.findIndex((item) => item.id === piece.id));
+  const total = productById(piece.product).captions.length;
+  const legacy = total ? spread % total : 0;
+  if (stored == null || (legacy !== 0 && stored === legacy)) return 0;
+  return stored;
+}
+
 function captionOf(piece: Piece, map: GradeMap) {
   const product = productById(piece.product);
   const total = product.captions.length;
@@ -77,6 +88,7 @@ export function GradeApp() {
   const [today, setToday] = useState<Date | null>(null);
   const [cursor, setCursor] = useState<Date | null>(null);
   const [layout, setLayout] = useState<"lista" | "grade">("lista");
+  const [filtro, setFiltro] = useState<"story" | "post" | "tudo">("tudo");
   const [view, setView] = useState<CalendarView>("semana");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -122,14 +134,14 @@ export function GradeApp() {
         if (slot?.at) {
           next[piece.id] = {
             at: slot.at,
-            caption: slot.caption ?? defaultCaptionIndex(piece),
+            caption: firstCaption(piece, slot?.caption),
             programmed: Boolean(slot.programmed),
           };
           continue;
         }
         next[piece.id] = {
           at: stamp(now),
-          caption: slot?.caption ?? defaultCaptionIndex(piece),
+          caption: firstCaption(piece, slot?.caption),
           programmed: false,
         };
       }
@@ -206,10 +218,30 @@ export function GradeApp() {
               </button>
             </div>
           </div>
+          <div className="mt-4 flex gap-2">
+            {(
+              [
+                ["story", "Story"],
+                ["post", "Post"],
+                ["tudo", "Tudo"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFiltro(id)}
+                className={filtro === id ? "chip chip-flame" : "chip"}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </header>
 
         <div className="mt-6 flex flex-col gap-8">
-          {(["story", "post"] as const).map((format) => {
+          {(["story", "post"] as const)
+            .filter((format) => filtro === "tudo" || filtro === format)
+            .map((format) => {
             const items = piecesSorted.filter((piece) => piece.format === format);
             if (items.length === 0) return null;
             return (
@@ -552,14 +584,14 @@ function ProgramControl({
   const state = phase(slot, now ?? new Date());
   if (state === "aberto") {
     return (
-      <button type="button" onClick={onProgram} className="chip chip-flame">
-        Programado
+      <button type="button" onClick={onProgram} className="chip">
+        Programar
       </button>
     );
   }
   return (
-    <div className="flex items-center gap-4">
-      <p className="text-sm">{state === "postado" ? "Postado" : "Programado"}</p>
+    <div className="flex items-center gap-2">
+      <p className="chip chip-flame">{state === "postado" ? "Postado" : "Programado"}</p>
       <button type="button" onClick={onUndo} className="chip">
         Voltar
       </button>
@@ -623,7 +655,7 @@ const PieceRow = memo(function PieceRow({
   const isStory = piece.format === "story";
 
   return (
-    <article className="py-3">
+    <article className="rounded-xl bg-surface p-3">
       <img
         src={piece.image}
         alt={`${product.name}, ${isStory ? "story" : "post"}`}
