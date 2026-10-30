@@ -83,7 +83,7 @@ function useCopy() {
   return { copied, copy };
 }
 
-export function GradeApp() {
+export function GradeApp({ cardId = null }: { cardId?: string | null }) {
   const [map, setMap] = useState<GradeMap>({});
   const [today, setToday] = useState<Date | null>(null);
   const [cursor, setCursor] = useState<Date | null>(null);
@@ -176,6 +176,15 @@ export function GradeApp() {
   }
 
   const openPiece = piecesSorted.find((piece) => piece.id === openId) ?? null;
+  const solo = cardId ? piecesSorted.find((piece) => piece.id === cardId) ?? null : null;
+
+  if (solo) {
+    return (
+      <main className="bg-ink text-fg">
+        <SoloCard piece={solo} slot={map[solo.id]} />
+      </main>
+    );
+  }
 
   return (
     <main className="bg-ink text-fg">
@@ -316,6 +325,34 @@ export function GradeApp() {
         />
       )}
     </main>
+  );
+}
+
+function SoloCard({ piece, slot }: { piece: Piece; slot: Slot | undefined }) {
+  const { product, text } = captionOf(piece, slot ? { [piece.id]: slot } : {});
+  const isStory = piece.format === "story";
+  return (
+    <article className="mx-auto max-w-2xl px-4 py-6">
+      <img
+        src={piece.image}
+        alt={`${product.name}, ${isStory ? "story" : "post"}`}
+        width={piece.w}
+        height={piece.h}
+        decoding="async"
+        className="block h-auto w-full bg-ink object-contain"
+        style={{ aspectRatio: `${piece.w} / ${piece.h}` }}
+      />
+      <p className="mt-4 text-sm">{product.name}</p>
+      {isStory ? (
+        <div className="mt-3">
+          <p className="text-sm">Adesivo de personalização de link para story</p>
+          <p className="mt-1 break-all text-sm">{STORY_LINK}</p>
+          <p className="mt-1 text-sm">{STORY_NAME}</p>
+        </div>
+      ) : (
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+      )}
+    </article>
   );
 }
 
@@ -690,6 +727,32 @@ const PieceRow = memo(function PieceRow({
         ) : (
           <CopyButton label="Copiar legenda" done={copied === "caption"} onClick={() => copy("caption", text)} />
         )}
+        <button
+          type="button"
+          className="chip"
+          onClick={() => {
+            const url = new URL(window.location.origin + window.location.pathname);
+            url.searchParams.set("card", piece.id);
+            const shareText = isStory ? `${STORY_LINK}\n${STORY_NAME}` : text;
+            void (async () => {
+              try {
+                if (navigator.share) {
+                  await navigator.share({
+                    title: product.name,
+                    text: shareText,
+                    url: url.toString(),
+                  });
+                  return;
+                }
+              } catch (error) {
+                if (error instanceof DOMException && error.name === "AbortError") return;
+              }
+              await copy("card", url.toString());
+            })();
+          }}
+        >
+          {copied === "card" ? "Link copiado" : "Encaminhar"}
+        </button>
       </div>
       {isStory ? (
         <div className="mt-3">
